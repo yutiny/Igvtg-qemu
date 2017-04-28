@@ -38,6 +38,32 @@
 static void vfio_disable_interrupts(VFIOPCIDevice *vdev);
 static void vfio_mmap_set_enabled(VFIOPCIDevice *vdev, bool enabled);
 
+VFIOPCIDevice *kvmgt_vdev;
+int kvmgt_get_anon_fd(void)
+{
+    struct vfio_region_info *anon_fd;
+    int ret;
+    int fd;
+
+    ret = vfio_get_dev_region_info(&kvmgt_vdev->vbasedev,
+                    VFIO_REGION_TYPE_PCI_VENDOR_TYPE | PCI_VENDOR_ID_INTEL,
+                    VFIO_REGION_SUBTYPE_INTEL_IGD_GVTG, &anon_fd);
+    if (ret) {
+        error_report("Device %s does not support requested IGD anon fd "
+                     "feature", kvmgt_vdev->vbasedev.name);
+        return -100;
+    }
+
+    ret = pread(kvmgt_vdev->vbasedev.fd, &fd, anon_fd->size, anon_fd->offset);
+    if (ret != anon_fd->size) {
+        error_report("vfio: Error reading IGD anon fd");
+        return -EINVAL;
+    }
+    printf("kvmgt: get anon fd:%d\n", fd);
+
+    return fd;
+}
+
 /*
  * Disabling BAR mmaping can be slow, but toggling it around INTx can
  * also be a huge overhead.  We try to get the best of both worlds by
@@ -2512,6 +2538,8 @@ static int vfio_initfn(PCIDevice *pdev)
     vdev->vbasedev.name = g_strdup(basename(vdev->vbasedev.sysfsdev));
     vdev->vbasedev.ops = &vfio_pci_ops;
     vdev->vbasedev.type = VFIO_DEVICE_TYPE_PCI;
+
+    kvmgt_vdev = vdev;
 
     tmp = g_strdup_printf("%s/iommu_group", vdev->vbasedev.sysfsdev);
     len = readlink(tmp, group_path, sizeof(group_path));

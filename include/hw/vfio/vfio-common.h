@@ -175,4 +175,6 @@ int vfio_spapr_create_window(VFIOContainer *container,
 int vfio_spapr_remove_window(VFIOContainer *container,
                              hwaddr offset_within_address_space);
 
+int kvmgt_get_anon_fd(void);
+
 #endif /* HW_VFIO_VFIO_COMMON_H */
